@@ -976,11 +976,11 @@ func runTests() async {
         check(settings.activeSelectedModel == "qwen3.5:9b", "initial local selection")
         check(settings.displayedSelectedModel == "qwen3.5:9b", "displayed model matches installed local model")
 
-        // 1. Switch to Ollama which also has qwen3.5:9b -> falls back to local selection
+        // 1. Switch to Ollama which also has qwen3.5:9b -> auto-picks recommended model from server
         let ollamaWithQwen = [installed("qwen3.5:9b", 5.2), installed("llama3:8b", 4.7)]
         try settings.enableOllama(AIConfiguration(provider: .ollama, model: "", baseURL: "http://127.0.0.1:11434"),
                                   installedModels: ollamaWithQwen)
-        check(settings.activeSelectedModel == "qwen3.5:9b", "ollama adopts matching local model on initial switch")
+        check(settings.activeSelectedModel == "qwen3.5:9b", "ollama auto-picks recommended model from server on initial switch")
         check(settings.displayedSelectedModel == "qwen3.5:9b", "displayed model matches adopted ollama model")
 
         // 2. User explicitly selects llama3:8b in Ollama
@@ -999,12 +999,12 @@ func runTests() async {
         check(settings.activeSelectedModel == "llama3:8b", "switching to ollama preserves previous ollama selection")
         check(settings.displayedSelectedModel == "llama3:8b", "displayed model reflects preserved ollama selection")
 
-        // 5. Switch to an Ollama server where neither llama3:8b nor qwen3.5:9b exists -> zero fallback to local
+        // 5. Switch to an Ollama server where neither llama3:8b nor qwen3.5:9b exists -> auto-picks from server (matching Local on main)
         let ollamaOther = [installed("mistral:7b", 4.1)]
         try settings.enableOllama(AIConfiguration(provider: .ollama, model: "", baseURL: "http://192.168.1.50:11434"),
                                   installedModels: ollamaOther)
-        check(settings.activeSelectedModel == "", "unmatched ollama server leaves model unselected")
-        check(settings.displayedSelectedModel == "", "unselected dropdown shows empty label after Model")
+        check(settings.activeSelectedModel == "mistral:7b", "unmatched ollama server auto-picks best model from server")
+        check(settings.displayedSelectedModel == "mistral:7b", "dropdown shows auto-picked model from new server")
         check(settings.usesCloudAI, "provider stays Ollama without fallback to local AI")
 
         // 6. User selects mistral:7b on the new server
@@ -1012,12 +1012,12 @@ func runTests() async {
         check(settings.activeSelectedModel == "mistral:7b", "new selection in dropdown")
         check(settings.displayedSelectedModel == "mistral:7b", "displayed label reflects new selection")
 
-        // 7. Model removed from server: flags missing without falling back to local
+        // 7. When Ollama server has 0 models, resets activeSelectedModel cleanly without missing model error
         settings.ollamaModels = []
         _ = try? settings.refreshOllamaModels(baseURL: "http://192.168.1.50:11434")
-        check(settings.ollamaSelectedModelMissing, "missing model flagged without fallback to local")
+        check(!settings.ollamaSelectedModelMissing, "0 models on server resets cleanly without error")
         check(settings.usesCloudAI, "stay on Ollama when server models change")
-        check(settings.activeSelectedModel == "mistral:7b", "retains configured Ollama model name")
+        check(settings.activeSelectedModel == "", "0 models on server leaves activeSelectedModel empty")
     } catch {
         check(false, "ollama model persistence test threw", "\(error)")
     }

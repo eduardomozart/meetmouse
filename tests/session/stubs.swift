@@ -150,12 +150,10 @@ final class SettingsViewModel {
         } else if !existingOllama.isEmpty,
                   let match = installedModels.first(where: { OllamaProvider.modelNamesMatch(configured: existingOllama, installed: $0.name) }) {
             resolvedModel = match.name
-        } else if !selectedModel.isEmpty,
-                  let match = installedModels.first(where: { OllamaProvider.modelNamesMatch(configured: selectedModel, installed: $0.name) }),
-                  !match.isCloudModel {
-            resolvedModel = match.name
+        } else if let fallback = Self.fallbackInstalledModel(in: installedModels) {
+            resolvedModel = fallback
         } else {
-            resolvedModel = ""
+            resolvedModel = installedModels.first?.name ?? ""
         }
         aiConfiguration = AIConfiguration(provider: .ollama, model: resolvedModel, baseURL: configuration.baseURL)
         selectedOllamaModel = resolvedModel
@@ -167,17 +165,23 @@ final class SettingsViewModel {
     func refreshOllamaModels(baseURL: String) throws -> [OllamaModel] {
         if aiConfiguration.provider == .ollama {
             if ollamaModels.isEmpty {
-                ollamaSelectedModelMissing = !aiConfiguration.model.isEmpty
+                ollamaSelectedModelMissing = false
+                activeSelectedModel = ""
             } else if !aiConfiguration.model.isEmpty {
                 if ollamaModels.contains(where: { OllamaProvider.modelNamesMatch(configured: aiConfiguration.model, installed: $0.name) }) {
                     ollamaSelectedModelMissing = false
+                } else if let fallback = Self.fallbackInstalledModel(in: ollamaModels) {
+                    activeSelectedModel = fallback
+                    ollamaSelectedModelMissing = false
                 } else {
-                    ollamaSelectedModelMissing = true
+                    activeSelectedModel = ollamaModels.first?.name ?? ""
+                    ollamaSelectedModelMissing = false
                 }
             } else {
-                if let match = ollamaModels.first(where: { OllamaProvider.modelNamesMatch(configured: selectedModel, installed: $0.name) }),
-                   !match.isCloudModel {
-                    activeSelectedModel = match.name
+                if let fallback = Self.fallbackInstalledModel(in: ollamaModels) {
+                    activeSelectedModel = fallback
+                } else {
+                    activeSelectedModel = ollamaModels.first?.name ?? ""
                 }
                 ollamaSelectedModelMissing = false
             }

@@ -2264,3 +2264,11 @@ Key design choices:
   apply the new configuration synchronously without performing a redundant second network test.
 - Any change to the Ollama server URL resets the tested state (`ollamaConnectionTested = false`),
   disabling "Save and enable" and requiring "Test connection" to be run again before the new endpoint can be saved and enabled.
+
+## 2026-11-11: Align Ollama provider behavior with main branch & decouple from Local settings
+
+- Zero-state onboarding at 0 models: When an Ollama server has 0 models installed (`ollamaModels.isEmpty`), `hasModels` evaluates to false and the Model dropdown is hidden. MeetMouse displays the standard zero-state onboarding view featuring the blue "Recommended for this Mac" card with the "Download Model" button, matching Local AI on `main`. Clicking "Download Model" pulls the recommended model directly to the Ollama server.
+- Model dropdown without placeholder: When 1 or more models exist on the Ollama server, the Model dropdown displays the server's installed models directly without a `"Select a model…"` placeholder option, aligning with `main`.
+- Auto-picking best model from Ollama server: When Ollama has no explicit model selected or the selected model is removed, it auto-picks the best model from the Ollama server's own installed models (`fallbackInstalledModel(in: models)`, preferring the RAM-recommended model if present, else smallest fitting local model).
+- Complete Local <-> Ollama decoupling: Ollama operates exclusively on its own settings (`selectedOllamaModel` / `aiConfiguration.model`), never reads or adopts Local's `selectedModel`, and dev standalone fallback sync on port 11434 uses Ollama's own selection.
+

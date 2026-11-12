@@ -60,13 +60,11 @@ final class SettingsViewModel {
                   let match = installedModels.first(where: { OllamaProvider.modelNamesMatch(configured: existingOllama, installed: $0.name) }) {
             // Ollama already has a model selected and it still exists on the server
             resolvedModel = match.name
-        } else if !selectedModel.isEmpty,
-                  let match = installedModels.first(where: { OllamaProvider.modelNamesMatch(configured: selectedModel, installed: $0.name) }),
-                  !match.isCloudModel {
-            // Fallback from Local to Ollama only if Ollama does not have a model selected or it no longer exists (and match is not a cloud model)
-            resolvedModel = match.name
+        } else if let fallback = Self.fallbackInstalledModel(in: installedModels) {
+            // Auto-pick best fitting model from Ollama's own installed models (matching Local on main)
+            resolvedModel = fallback
         } else {
-            resolvedModel = ""
+            resolvedModel = installedModels.first?.name ?? ""
         }
         cancelDownload()
         downloadError = nil
@@ -97,7 +95,7 @@ final class SettingsViewModel {
         guard OllamaLocalEndpoint.existingManagedServer() == nil else { return }
         if aiConfiguration.provider == .local {
             OllamaLocalEndpoint.setActivePort(OllamaLocalEndpoint.standaloneDefaultPort)
-            let fallbackModel = !selectedOllamaModel.isEmpty ? selectedOllamaModel : selectedModel
+            let fallbackModel = selectedOllamaModel
             let config = AIConfiguration(provider: .ollama, model: fallbackModel, baseURL: OllamaEndpoint.defaultBaseURL)
             aiConfiguration = config
             AIConfiguration.runtimeOverride = config
@@ -480,7 +478,10 @@ final class SettingsViewModel {
         self.ollamaModels = models
         if aiConfiguration.provider == .ollama {
             if models.isEmpty {
-                self.ollamaSelectedModelMissing = !aiConfiguration.model.isEmpty
+                self.ollamaSelectedModelMissing = false
+                if !aiConfiguration.model.isEmpty {
+                    self.activeSelectedModel = ""
+                }
             } else if !aiConfiguration.model.isEmpty {
                 if models.contains(where: { OllamaProvider.modelNamesMatch(configured: aiConfiguration.model, installed: $0.name) }) {
                     self.ollamaSelectedModelMissing = false
@@ -494,18 +495,23 @@ final class SettingsViewModel {
                         self.ollamaSelectedModelMissing = true
                     }
                 } else {
-                    // Selected Ollama model is missing on the server.
-                    // No fallback to Local AI or fallback catalog models (matches Claude / OpenAI).
-                    self.ollamaSelectedModelMissing = true
+                    // Selected Ollama model is missing on the server:
+                    // Auto-pick from Ollama's available models (aligns with Local on main)
+                    if let fallback = Self.fallbackInstalledModel(in: models) {
+                        activeSelectedModel = fallback
+                        self.ollamaSelectedModelMissing = false
+                    } else {
+                        activeSelectedModel = models.first?.name ?? ""
+                        self.ollamaSelectedModelMissing = false
+                    }
                 }
             } else {
                 // Ollama currently has no model selected:
-                // Check if Local's selectedModel exists on the Ollama server (non-cloud only):
-                if let match = models.first(where: { OllamaProvider.modelNamesMatch(configured: selectedModel, installed: $0.name) }),
-                   !match.isCloudModel {
-                    activeSelectedModel = match.name
-                } else if let fallback = Self.fallbackInstalledModel(in: models) {
+                // Auto-pick best model from Ollama's own models (aligns with Local on main)
+                if let fallback = Self.fallbackInstalledModel(in: models) {
                     activeSelectedModel = fallback
+                } else {
+                    activeSelectedModel = models.first?.name ?? ""
                 }
                 self.ollamaSelectedModelMissing = false
             }
@@ -685,6 +691,8 @@ final class SettingsViewModel {
                     }
                     if progress.isComplete {
                         self.downloadingModel = nil
+                        self.selectedOllamaModel = fullName
+                        UserDefaults.standard.set(fullName, forKey: "selectedOllamaModel")
                         self.aiConfiguration.model = fullName
                         self.aiConfiguration.save()
                         _ = try? await self.refreshOllamaModels(baseURL: baseURL.absoluteString)
@@ -839,6 +847,18 @@ final class SettingsViewModel {
             do {
                 try await OllamaProvider.deleteModel(baseURL: baseURL, name: name)
                 _ = try? await refreshOllamaModels(baseURL: baseURL.absoluteString)
+                if activeSelectedModel == name || ollamaModels.isEmpty {
+                    if ollamaModels.isEmpty {
+                        selectedOllamaModel = ""
+                        aiConfiguration.model = ""
+                        ollamaSelectedModelMissing = false
+                        aiConfiguration.save()
+                    } else if let fallback = Self.fallbackInstalledModel(in: ollamaModels) {
+                        activeSelectedModel = fallback
+                    } else {
+                        activeSelectedModel = ollamaModels.first?.name ?? ""
+                    }
+                }
             } catch {
                 downloadError = "Failed to delete: \(error.localizedDescription)"
             }

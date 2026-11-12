@@ -5,6 +5,17 @@ Auto-injected into every Claude session in this repo (SessionStart hook in
 Keep it short: current state, outstanding work, and the prompt to start from.
 The durable "why" behind choices goes in `decisions.md`, not here.
 
+## Current state (2026-11-11): Ollama provider behavior aligned with main branch & decoupled from Local settings — completed
+
+1. Align Ollama provider behavior with Local AI on `main`:
+   - At 0 models on Ollama server (`ollamaModels.isEmpty`), `hasModels` evaluates to false and the Model dropdown is hidden. MeetMouse displays the standard zero-state onboarding view with the blue "Recommended for this Mac" card and the "Download Model" button (pulling the recommended model to the Ollama server).
+   - When 1 or more models exist on the Ollama server, the Model dropdown is displayed listing the server's models directly without any `"Select a model…"` placeholder.
+   - When Ollama has no explicit model selected or the selected model is removed, it automatically selects the best model from the Ollama server (`fallbackInstalledModel(in: models)`, preferring the RAM-recommended model if present, else smallest fitting model).
+   - Deleting the active model on an Ollama server auto-picks the next best model if models remain, or cleanly resets to 0 models / zero-state screen without missing-model errors.
+2. Complete Local $\leftrightarrow$ Ollama decoupling:
+   - Ollama never inherits Local's `selectedModel`.
+   - `enableOllama()`, `syncDevFallbackOllamaIfNeeded()`, and `refreshOllamaModels()` operate exclusively on Ollama's own settings (`selectedOllamaModel`) and server models.
+
 ## Current state (2026-11-08): Ollama cloud models confirmation dialog, "Cloud" badge, RAM calculation exclusion, auto-refresh & dev mode sync — completed
 
 1. Display `"Cloud"` instead of `"0 MB"` for Ollama cloud models (`size < 1 MB`, `remote_host` present, or `:cloud`/`-cloud` tag) across the Coaching tab's `Model` dropdown and `Download Models` modal (`ModelCatalogView`).

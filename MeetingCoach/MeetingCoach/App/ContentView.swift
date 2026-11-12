@@ -2189,9 +2189,6 @@ struct ModelSection: View {
                     DisclosureGroup(isExpanded: $isExpanded) {
                         VStack(alignment: .leading, spacing: 8) {
                             Picker("", selection: modelSelectionBinding) {
-                                if !settings.activeModels.contains(where: { OllamaProvider.modelNamesMatch(configured: settings.activeSelectedModel, installed: $0.name) }) {
-                                    Text("Select a model…").tag("")
-                                }
                                 // One Text per row on purpose: the macOS menu
                                 // picker drops an HStack's trailing column, so
                                 // the size used to vanish from the dropdown
